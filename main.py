@@ -137,7 +137,8 @@ async def get_server(*, force: bool = False) -> guilded.Server:
     Get the server.
 
     Args:
-        force (bool, optional): Don't allow reading from cache. Defaults to False.
+        force (bool, optional): Don't allow reading from cache. Defaults to
+        False.
 
     Raises:
         RuntimeError: If we couldn't get the server
