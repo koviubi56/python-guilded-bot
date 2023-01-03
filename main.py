@@ -750,4 +750,7 @@ async def on_message(event: guilded.MessageEvent) -> None:
 
 
 aiohttp.client.ClientSession.__init__.__kwdefaults__["trust_env"] = True
+aiohttp.client.ClientSession.ws_connect.__kwdefaults__[
+    "proxy"
+] = "http://proxy.server:3128"
 client.run(os.environ["BOT_TOKEN"])
