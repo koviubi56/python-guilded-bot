@@ -23,6 +23,7 @@ import os
 import textwrap
 from typing import Any, Callable, Coroutine, Iterable, cast
 
+import aiohttp
 import dotenv
 import guilded
 import mylog
@@ -748,4 +749,5 @@ async def on_message(event: guilded.MessageEvent) -> None:
             break
 
 
+aiohttp.client.ClientSession.__init__.__kwdefaults__["trust_env"] = True
 client.run(os.environ["BOT_TOKEN"])
