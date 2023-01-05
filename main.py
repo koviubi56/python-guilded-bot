@@ -18,14 +18,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 # SPDX-License-Identifier: GPL-3.0-or-later
 # pylint: disable=global-statement,line-too-long,no-member,import-error
-import contextlib
+import base64
+import json
 import os
+import pickle  # noqa: S403
 import textwrap
+import traceback as tracebacklib
 from typing import Any, Callable, Coroutine, Iterable, cast
 
-import aiohttp
 import dotenv
 import guilded
+import httpx
 import mylog
 from bpaste import uploader
 
@@ -38,6 +41,8 @@ client = guilded.Client(experimental_event_style=True)
 SERVER_ID = "Gjkqrv7l"
 DEFAULT_CHANNEL_ID = "6f804c27-755e-486d-9136-d825b24e4104"
 MODERATOR_ID = 33358040
+RUN_PYTHON_FULL_URL = "https://runpy.koviubi56.repl.co/run"
+
 
 WELCOME = (
     ":hi:{} has joined the server. :PeepoWave: Welcome! Please make sure"
@@ -377,6 +382,18 @@ def shorten(text: str) -> str:
     return textwrap.shorten(text, 2040)
 
 
+async def make_request(
+    method: str,
+    url: str,
+    client_kwargs: dict[str, Any] | None = None,
+    request_kwargs: dict[str, Any] | None = None,
+) -> httpx.Response:
+    client_kwargs = client_kwargs or {}
+    request_kwargs = request_kwargs or {}
+    async with httpx.AsyncClient(**client_kwargs) as aclient:
+        return await aclient.request(method, url, **request_kwargs)
+
+
 @client.event
 async def on_ready() -> None:
     """On ready."""
@@ -574,69 +591,71 @@ async def help_channel_setup(message: guilded.Message) -> None:
     await message.delete()
 
 
-async def exec_errorhandle(
-    message: guilded.Message, exc: BaseException
-) -> None:
-    """
-    Handle errors with !exec
+async def exec_200(result: str, message: guilded.Message) -> None:
+    logger.debug("OK, 200")
 
-    Args:
-        message (guilded.Message): The message
-        exc (BaseException): The exception
-    """
-    mod_ping = f"<@{MODERATOR_ID}>"
-
-    if "range() object" in str(exc):
-        logger.debug("No panic, too big range()")
-        await message.reply(
-            embed=guilded.Embed(
-                description=shorten(
-                    "Your code contains a range() object which is too"
-                    " large. For security reasons we only allow no more than a"
-                    " 1000 iterations."
-                ),
-                color=0xFF8000,
-            ),
-            silent=False,
-        )
+    if len(result) > 2040:
+        logger.debug("It's too long!")
+        with logger.ctxmgr:
+            paster = uploader.BPaster(language=None)
+            logger.debug(f"{paster = !r}")
+            url = paster.submit(result)
+            logger.debug(f"{url = !r}")
+            text = (
+                "Your code's output is too long. View it"
+                f" [here]({paster.url.removesuffix('/')}{url})"
+            )
+            await message.reply(
+                embed=guilded.Embed(description=text, color=0xFFFF00)
+            )
         return
 
-    if "name 'input' is not defined" in str(exc):
-        logger.debug("No panic, input()")
-        await message.reply(
-            embed=guilded.Embed(
-                description=shorten(
-                    "You cannout use input() through our bot."
-                ),
-                color=0xFF8000,
-            ),
-            silent=False,
-        )
-        return
-
-    if isinstance(exc, RuntimeError):
-        logger.debug("RuntimeError, sending message")
-        await message.reply(
-            embed=guilded.Embed(
-                description=str(exc).replace("{}", mod_ping),
-                color=0xFF8000,
-            ),
-            silent=False,
-        )
-        return
-
-    logger.critical("*!*!*! UNEXPECTED UNHANDLED EXCEPTION !*!*!", True)
-    await send_msg_to_moderation_log(
-        "Unexpected unhandled exception!", True, 0xFF0000
-    )
+    text = f"""Here's the output of your code:
+```text
+{result}```"""
+    logger.info(text)
     await message.reply(
         embed=guilded.Embed(
-            title="Unexpected unhandled exception!",
-            description=f"The {mod_ping} team has been notified",
-            color=0xFF0000,
+            description=text,
         ),
-        silent=False,
     )
+    logger.info("Success!")
+
+
+async def exec_400(error: dict[str, Any], message: guilded.Message) -> None:
+    logger.info("400!")
+    if error == "not_allowed":
+        logger.warning("NOT ALLOWED!")
+        await message.reply(
+            embed=guilded.Embed(
+                description="Your code includes stuff that are not"
+                " allowed. HINT: The use of certain modules, and the"
+                " use of open() is not allowed.",
+                color=0xFF0000,
+            ),
+        )
+    elif error == "timed_out":
+        logger.warning("TIMED OUT!")
+        await message.reply(
+            embed=guilded.Embed(
+                description="Your code timed out. Please don't do that"
+                " again.",
+                color=0xFF0000,
+            ),
+        )
+    elif error == "exception":
+        logger.info("Exception")
+        exception_pickled_base64: str = error["exception_pickled_base64"]
+        exception_pickled = base64.b64decode(
+            exception_pickled_base64.encode(encoding="utf-8")
+        )
+        exception = pickle.loads(exception_pickled)  # noqa: S301
+        text = f"""Your code raised an exception:
+```py
+{tracebacklib.format_exception(exception)}```"""
+        await message.reply(
+            embed=guilded.Embed(description=text, color=0xFFFF00)
+        )
 
 
 async def exec(  # pylint: disable=redefined-builtin
@@ -662,55 +681,59 @@ async def exec(  # pylint: disable=redefined-builtin
         message_content = message_content.strip()
         logger.debug(f"Code is {message_content}")
 
+        data = json.dumps({"code": message_content})
+        logger.info(
+            f"Making POST request to {RUN_PYTHON_FULL_URL!r} with data"
+            f" {data!r}..."
+        )
         try:
-            sandbox.logger.list.clear()
-            logger.debug("Giving code to sandbox...")
-            result = sandbox.main(message_content)
-        except BaseException as exc:
-            logger.info(f"Exception! {exc!r}")
-            return await exec_errorhandle(message, exc)
-        finally:
-            logger.debug("Sending log events to moderation log channel:")
-            with logger.ctxmgr:
-                for event in sandbox.logger.list:
-                    level = mylog.to_level(event.level, True)
-                    if level > mylog.Level.info:
-                        logger.info(f"Sending {event!r}...")
-                        await send_msg_to_moderation_log(
-                            f"{event.msg}",
-                            level > mylog.Level.warning,
-                            (
-                                0xFF8000
-                                if level == mylog.Level.error
-                                else 0xFF0000
-                                if level == mylog.Level.critical
-                                else 0xFFFF00
-                            ),
-                        )
-
-        if len(result) > 2040:
-            logger.debug("It's too long!")
-            with logger.ctxmgr:
-                paster = uploader.BPaster(language=None)
-                logger.debug(f"{paster = !r}")
-                url = paster.submit(result)
-                logger.debug(f"{url = !r}")
-                text = (
-                    "Your code's output is too long. View it"
-                    f" [here]({paster.url.removesuffix('/')}{url})"
-                )
-                await message.reply(
-                    embed=guilded.Embed(description=text, color=0xFFFF00)
-                )
-        else:
-            text = f"Here's the output of your code:\n```text\n{result}```"
-            logger.info(text)
+            response = await make_request(
+                "POST",
+                RUN_PYTHON_FULL_URL,
+                request_kwargs={"data": data},
+            )
+        except httpx.ReadTimeout:
+            logger.warning("TIMEOUT!", True)
             await message.reply(
                 embed=guilded.Embed(
-                    description=text,
+                    description="Your code timed out. Please don't do that"
+                    " again.",
+                    color=0xFF0000,
                 ),
             )
-            logger.info("Success!")
+            return
+        except Exception:
+            logger.error("EXCEPTION WHILE REQUESTING!", True)
+            await message.reply(
+                embed=guilded.Embed(
+                    description="An exception was raised while making the"
+                    " request. Contact staff please."
+                )
+            )
+            return
+        if response.status_code == 200:
+            await exec_200(response.json(), message)
+        elif response.status_code == 400:
+            await exec_400(response.json()["error"], message)
+        else:
+            logger.error(f"!*!*! STATUS CODE IS {response.status_code} *!*!*!")
+            logger.error(
+                f"""=====
+DEBUG DETAILS
+{response = !r}
+{response.status_code = !r}
+{response.content = !r}
+{response.text = !r}
+{response.json() = !r}
+====="""
+            )
+            await message.reply(
+                embed=guilded.Embed(
+                    description=f"Status code is {response.status_code}! Try"
+                    " again, or contact staff.",
+                    color=0xFF0000,
+                )
+            )
 
 
 # These commands only reply with text and... that's it
