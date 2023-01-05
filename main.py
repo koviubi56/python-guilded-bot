@@ -258,20 +258,29 @@ async def send_msg_to_moderation_log(
         ping_ (bool): Include a mention to moderators
         color (int): The color of the ember
     """
-    with contextlib.suppress(Exception):
-        mod_ping = f"<@{MODERATOR_ID}>"
-        moderation_log_channel = cast(
-            guilded.TextChannel,
-            await get_channel(CHANNEL_MODERATION_LOG),
-        )
-        await moderation_log_channel.send(
-            f"{mod_ping} @Moderator" if ping_ else "",
-            embed=guilded.Embed(
-                description=f"{f'{mod_ping} ' if ping_ else ''}{txt}",
-                color=color,
-            ),
-            silent=False,
-        )
+    logger.info(f"Sending {txt} to moderation log...")
+    with logger.ctxmgr:
+        try:
+            mod_ping = f"<@{MODERATOR_ID}>"
+            logger.debug("Getting moderation log channel...")
+            moderation_log_channel = cast(
+                guilded.TextChannel,
+                await get_channel(CHANNEL_MODERATION_LOG),
+            )
+            logger.debug(f"Got {moderation_log_channel!r}, sending message...")
+            await moderation_log_channel.send(
+                f"{mod_ping} @Moderator" if ping_ else "",
+                embed=guilded.Embed(
+                    description=f"{f'{mod_ping} ' if ping_ else ''}{txt}",
+                    color=color,
+                ),
+                silent=False,
+            )
+            logger.info("Success!")
+        except Exception:
+            logger.error(
+                f"Failed to send {txt} to moderation log; ignoring", True
+            )
 
 
 async def get_help_channels() -> list[guilded.TextChannel]:
@@ -397,14 +406,19 @@ async def on_member_join(event: guilded.MemberJoinEvent) -> None:
     Args:
         event (guilded.MemberJoinEvent): The event.
     """
-    default_channel = await get_default_channel()
-    await default_channel.send(
-        embed=guilded.Embed(
-            description=WELCOME.format(
-                f"<@{event.member.id}>",
+    logger.info(f"{event.member} joined!")
+    with logger.ctxmgr:
+        logger.debug("Getting default channel...")
+        default_channel = await get_default_channel()
+        logger.debug(f"Got {default_channel}, sending message...")
+        await default_channel.send(
+            embed=guilded.Embed(
+                description=WELCOME.format(
+                    f"<@{event.member.id}>",
+                ),
             ),
-        ),
-    )
+        )
+        logger.info(f"Successfully greeted {event.member}")
 
 
 # ****************************************************************************
@@ -429,6 +443,7 @@ async def claim_help_channel(
         channel (guilded.TextChannel): The channel.
         user_id (str): The user's ID.
     """
+    logger.info(f"User with ID {user_id} is claiming {channel}")
     await channel.send(
         embed=guilded.Embed(
             description=HELP_CHANNEL_YOURS.format(f"<@{user_id}>")
@@ -446,6 +461,7 @@ async def done_help_channel(
         channel (guilded.TextChannel): The help channel.
         user_id (str): The user's ID.
     """
+    logger.info(f"User with ID {user_id} is marking {channel} as done")
     await channel.send(
         embed=guilded.Embed(
             description=HELP_CHANNEL_DONE.format(f"<@{user_id}>")
@@ -477,27 +493,35 @@ async def on_message_reaction_add(
     if message.author_id != client.user_id:
         return  # not on the bot's message
 
-    if event.emote.name == "hand":
-        await claim_help_channel(
-            event.channel,
-            event.user_id,
-        )
-    elif event.emote.name == "checkered_flag":
-        await done_help_channel(
-            event.channel,
-            event.user_id,
-        )
-    else:
-        await event.channel.send(
-            embed=guilded.Embed(
-                description=f"<@{event.user_id}> You reacted with the"
-                f" `{event.emote.name}`"
-                " emote. Please react with the default `hand` emote ( :hand: )"
-                " or with the default `checkered_flag` emote"
-                " ( :checkered_flag: )."
-            ),
-            private=True,
-        )
+    logger.info(
+        f"User with ID {event.user_id} added a reaction on bot's message in"
+        f" channel with ID {event.channel_id}"
+    )
+    with logger.ctxmgr:
+        if event.emote.name == "hand":
+            logger.debug("It's hand")
+            await claim_help_channel(
+                event.channel,
+                event.user_id,
+            )
+        elif event.emote.name == "checkered_flag":
+            logger.debug("It's flag")
+            await done_help_channel(
+                event.channel,
+                event.user_id,
+            )
+        else:
+            logger.warning("It's neither!")
+            await event.channel.send(
+                embed=guilded.Embed(
+                    description=f"<@{event.user_id}> You reacted with the"
+                    f" `{event.emote.name}`"
+                    " emote. Please react with the default `hand` emote"
+                    " ( :hand: ) or with the default `checkered_flag` emote"
+                    " ( :checkered_flag: )."
+                ),
+                private=True,
+            )
 
 
 # ****************************************************************************
@@ -566,6 +590,7 @@ async def exec_errorhandle(
     mod_ping = f"<@{MODERATOR_ID}>"
 
     if "range() object" in str(exc):
+        logger.debug("No panic, too big range()")
         await message.reply(
             embed=guilded.Embed(
                 description=shorten(
@@ -580,6 +605,7 @@ async def exec_errorhandle(
         return
 
     if "name 'input' is not defined" in str(exc):
+        logger.debug("No panic, input()")
         await message.reply(
             embed=guilded.Embed(
                 description=shorten(
@@ -592,6 +618,7 @@ async def exec_errorhandle(
         return
 
     if isinstance(exc, RuntimeError):
+        logger.debug("RuntimeError, sending message")
         await message.reply(
             embed=guilded.Embed(
                 description=str(exc).replace("{}", mod_ping),
@@ -624,60 +651,69 @@ async def exec(  # pylint: disable=redefined-builtin
     Args:
         message (guilded.Message): The message
     """
-    message_content = message.content
-    message_content = message_content.removeprefix("!exec")
-    message_content = message_content.replace("```python", "")
-    message_content = message_content.replace("```py", "")
-    message_content = message_content.replace("```", "")
-    message_content = message_content.replace("`", "")
-    message_content = message_content.strip()
-
     logger.info(
-        f"Executing by user ID {message.author_id!r} code {message_content!r}"
+        f"Got execution request! {message = !r} (by user ID"
+        f" {message.author_id})"
     )
+    with logger.ctxmgr:
+        message_content = message.content
+        message_content = message_content.removeprefix("!exec")
+        message_content = message_content.replace("```python", "")
+        message_content = message_content.replace("```py", "")
+        message_content = message_content.replace("```", "")
+        message_content = message_content.replace("`", "")
+        message_content = message_content.strip()
+        logger.debug(f"Code is {message_content}")
 
-    try:
-        sandbox.logger.list.clear()
-        result = sandbox.main(message_content)
-    except BaseException as exc:
-        return await exec_errorhandle(message, exc)
-    finally:
-        for event in sandbox.logger.list:
-            level = mylog.to_level(event.level, True)
-            if level > mylog.Level.info:
-                await send_msg_to_moderation_log(
-                    f"{event.msg}",
-                    level > mylog.Level.warning,
-                    (
-                        0xFF8000
-                        if level == mylog.Level.error
-                        else 0xFF0000
-                        if level == mylog.Level.critical
-                        else 0xFFFF00
-                    ),
+        try:
+            sandbox.logger.list.clear()
+            logger.debug("Giving code to sandbox...")
+            result = sandbox.main(message_content)
+        except BaseException as exc:
+            logger.info(f"Exception! {exc!r}")
+            return await exec_errorhandle(message, exc)
+        finally:
+            logger.debug("Sending log events to moderation log channel:")
+            with logger.ctxmgr:
+                for event in sandbox.logger.list:
+                    level = mylog.to_level(event.level, True)
+                    if level > mylog.Level.info:
+                        logger.info(f"Sending {event!r}...")
+                        await send_msg_to_moderation_log(
+                            f"{event.msg}",
+                            level > mylog.Level.warning,
+                            (
+                                0xFF8000
+                                if level == mylog.Level.error
+                                else 0xFF0000
+                                if level == mylog.Level.critical
+                                else 0xFFFF00
+                            ),
+                        )
+
+        if len(result) > 2040:
+            logger.debug("It's too long!")
+            with logger.ctxmgr:
+                paster = uploader.BPaster(language=None)
+                logger.debug(f"{paster = !r}")
+                url = paster.submit(result)
+                logger.debug(f"{url = !r}")
+                text = (
+                    "Your code's output is too long. View it"
+                    f" [here]({paster.url.removesuffix('/')}{url})"
                 )
-
-    if len(result) > 2040:
-        logger.debug("It's too long!")
-        paster = uploader.BPaster(language=None)
-        logger.debug(f"{paster = !r}")
-        url = paster.submit(result)
-        logger.debug(f"{url = !r}")
-        text = (
-            "Your code's output is too long. View it"
-            f" [here]({paster.url.removesuffix('/')}{url})"
-        )
-        await message.reply(
-            embed=guilded.Embed(description=text, color=0xFFFF00)
-        )
-    else:
-        text = f"Here's the output of your code:\n```text\n{result}```"
-        logger.debug(text)
-        await message.reply(
-            embed=guilded.Embed(
-                description=text,
-            ),
-        )
+                await message.reply(
+                    embed=guilded.Embed(description=text, color=0xFFFF00)
+                )
+        else:
+            text = f"Here's the output of your code:\n```text\n{result}```"
+            logger.info(text)
+            await message.reply(
+                embed=guilded.Embed(
+                    description=text,
+                ),
+            )
+            logger.info("Success!")
 
 
 # These commands only reply with text and... that's it
