@@ -29,8 +29,6 @@ import guilded
 import mylog
 from bpaste import uploader
 
-import sandbox
-
 dotenv.load_dotenv()
 
 logger = mylog.root.get_child()
@@ -269,7 +267,6 @@ async def send_msg_to_moderation_log(
             )
             logger.debug(f"Got {moderation_log_channel!r}, sending message...")
             await moderation_log_channel.send(
-                f"{mod_ping} @Moderator" if ping_ else "",
                 embed=guilded.Embed(
                     description=f"{f'{mod_ping} ' if ping_ else ''}{txt}",
                     color=color,
