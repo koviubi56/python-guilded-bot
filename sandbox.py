@@ -138,7 +138,7 @@ def restricted_compile(source_code: str) -> types.CodeType:
     )
 
     if _compile_result.errors:
-        logger.warning(f"Compiled {source_code!r} with errors!")
+        logger.warning(f"Compiled ```\n{source_code}\n``` with errors!")
         error = "\n".join(_compile_result.errors)
         raise RuntimeError(
             "Could not compile your code:"
@@ -305,7 +305,7 @@ def restricted_execute(
         )
     except Exception as exc:
         logger.warning(
-            f"Exception while executing code {_source_code!r}: {exc}"
+            f"Exception while executing code ```\n{_source_code}\n```\n{exc}"
         )
         raise RuntimeError(
             f"Could not run your code:\n```py\n{traceback.format_exc()}```"
@@ -346,7 +346,9 @@ def main(source_code: str) -> str:
         logger.info("Checking if it has anything that is not allowed...")
         with logger.ctxmgr:
             if check_not_allowed(source_code):
-                logger.error(f"Code {source_code!r} has NOT ALLOWED stuff!")
+                logger.error(
+                    f"Code has NOT ALLOWED stuff:\n```\n{source_code}\n```"
+                )
                 raise RuntimeError(
                     """Your code is not allowed to be ran for security\
  reasons. The usage of
