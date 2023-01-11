@@ -37,52 +37,67 @@ dotenv.load_dotenv()
 logger = mylog.root.get_child()
 logger.threshold = mylog.Level.debug
 
+if os.environ.get("KEEPALIVE", "0") == "1":
+    from threading import Thread
+
+    import uvicorn
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app = FastAPI()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=True,
+    )
+
+    @app.get("/")
+    def index():
+        return 200
+
+    Thread(
+        target=lambda: uvicorn.run(app, host="0.0.0.0", port=8000),
+        daemon=True,
+    ).start()
+
 client = guilded.Client(experimental_event_style=True)
 SERVER_ID = "Gjkqrv7l"
 DEFAULT_CHANNEL_ID = "6f804c27-755e-486d-9136-d825b24e4104"
 MODERATOR_ID = 33358040
 RUN_PYTHON_FULL_URL = "https://runpy.koviubi56.repl.co/run"
 
-
 WELCOME = (
     ":hi:{} has joined the server. :PeepoWave: Welcome! Please make sure"
     " to read our [rules](https://www.guilded.gg/Python-Guilded/groups"
     "/dY0jjNED/channels/31e82bcb-7bb2-4469-94da-be8134faf46e/chat) and [guide"
     " on how to ask questions](https://www.guilded.gg/Python-Guilded/groups"
-    "/dY0jjNED/channels/9af786cf-d4c1-49fe-8e42-fde1fe60b614/chat)."
-)
+    "/dY0jjNED/channels/9af786cf-d4c1-49fe-8e42-fde1fe60b614/chat).")
 LAW = (
     ":blobstop: Per our [rules](https://www.guilded.gg/Python-Guilded/groups"
     "/dY0jjNED/channels/31e82bcb-7bb2-4469-94da-be8134faf46e/chat), we are"
     " unable to help on projects that may breach terms of services, are"
     " malicious or inappropriate, or break laws. (Ping the moderators if"
-    " needed)"
-)
-EXAM = (
-    ":thumbs-down-cat: Sorry, but per our [rules](https://www.guilded.gg"
-    "/Python-Guilded/groups/dY0jjNED/channels/31e82bcb-7bb2-4469-94da"
-    "-be8134faf46e/chat) we cannot help with ongoing exams in any way."
-)
+    " needed)")
+EXAM = (":thumbs-down-cat: Sorry, but per our [rules](https://www.guilded.gg"
+        "/Python-Guilded/groups/dY0jjNED/channels/31e82bcb-7bb2-4469-94da"
+        "-be8134faf46e/chat) we cannot help with ongoing exams in any way.")
 PAID = (
     ":pepe-money: Per our [rules](https://www.guilded.gg/Python-Guilded/groups"
     "/dY0jjNED/channels/31e82bcb-7bb2-4469-94da-be8134faf46e/chat), offering"
     " or asking for paid work of any kind is not allowed. (Ping the moderators"
-    " if needed)"
-)
+    " if needed)")
 AUTO_AI = (
     ":robot_face: Per our [rules](https://www.guilded.gg/Python-Guilded/groups"
     "/dY0jjNED/channels/31e82bcb-7bb2-4469-94da-be8134faf46e/chat), the use of"
     " ChatGPT or other automated AI services is prohibited. (Ping the"
-    " moderators if needed)"
-)
+    " moderators if needed)")
 IMAGE_CODE = (
     ":camera_with_flash: Please send your code as text, and not as an image."
-    " [(Why?)](https://idownvotedbecau.se/imageofcode)"
-)
-IMAGE_EXC = (
-    ":camera: Please send the traceback as text instead of an image."
-    " [(Why?)](https://idownvotedbecau.se/imageofanexception/)"
-)
+    " [(Why?)](https://idownvotedbecau.se/imageofcode)")
+IMAGE_EXC = (":camera: Please send the traceback as text instead of an image."
+             " [(Why?)](https://idownvotedbecau.se/imageofanexception/)")
 NO_ATTEMPT = (
     ":pepe-unfair: **It appears no attempt was made.**\nPutting forth the"
     " effort to attempt solving a problem, even if the attempt is not"
@@ -90,14 +105,12 @@ NO_ATTEMPT = (
     " otherwise. If an attempt was made but the details of that attempt were"
     " not provided it may result in answerers duplicating effort, which is a"
     " waste of everyone's time.\n[More information.](https://idownvotedbecau"
-    ".se/noattempt/)"
-)
+    ".se/noattempt/)")
 HELP_CHANNEL_SETUP = (
     "If you would like to claim this help channel please react to this message"
     " with :hand: (`hand`).\nIf you're not sure what to do, read our guide"
     " [here](https://www.guilded.gg/Python-Guilded/groups"
-    "/dY0jjNED/channels/9af786cf-d4c1-49fe-8e42-fde1fe60b614/chat)"
-)
+    "/dY0jjNED/channels/9af786cf-d4c1-49fe-8e42-fde1fe60b614/chat)")
 TRACEBACK = (
     "**We need ALL error details to help you!**"
     "\nIn your question, you indicated that there is an error in your code."
@@ -117,12 +130,11 @@ TRACEBACK = (
     "\nGet a text report of all of the contents within it. Remember, the"
     " details of the Exception should be captured as text; do not take an"
     " image of the Exception details!"
-    "\n[More information](https://idownvotedbecau.se/noexceptiondetails/)"
-)
+    "\n[More information](https://idownvotedbecau.se/noexceptiondetails/)")
 HELP_CHANNEL_YOURS = (
     "The channel is yours {}! Ask your question, and wait for answers. Once "
-    " you're done please react to this message with a :checkered_flag:"
-)
+    " you've got the answer to your question please react to this message with"
+    " a :checkered_flag:")
 HELP_CHANNEL_DONE = (
     "Thanks everyone for helping {}!"
     "\n-----------------------------------------------------------"
@@ -130,8 +142,7 @@ HELP_CHANNEL_DONE = (
     " message with :hand: (`hand`)."
     "\nIf you're not sure what to do, read [our guide](https://www.guilded.gg"
     "/Python-Guilded/groups/dY0jjNED/channels/9af786cf-d4c1-49fe-8e42"
-    "-fde1fe60b614/chat)."
-)
+    "-fde1fe60b614/chat).")
 
 _server_cache = None
 
@@ -157,14 +168,12 @@ async def get_server(*, force: bool = False) -> guilded.Server:
 
     # get/fetch the server
     return_value = (await client.fetch_server(SERVER_ID)) or (
-        await client.fetch_server(client.internal_server_id)
-    )
+        await client.fetch_server(client.internal_server_id))
     # if we couldn't get it -> raise
     if not return_value:
         logger.critical(
             f"*!*!* CANNOT GET SERVER! With ID {SERVER_ID!r} we got"
-            f" {return_value!r}"
-        )
+            f" {return_value!r}")
         raise RuntimeError("CANNOT GET SERVER! See log^ for more info")
 
     # set cache
@@ -197,17 +206,14 @@ async def get_default_channel(*, force: bool = False) -> guilded.TextChannel:
 
     # fetch channel
     return_value = await server.fetch_channel(DEFAULT_CHANNEL_ID) or (
-        await server.fetch_default_channel()
-    )
+        await server.fetch_default_channel())
     # if we couldn't get it -> raise
     if not return_value:
         logger.critical(
             f"*!*!* CANNOT GET DEFAULT CHANNEL! With ID {DEFAULT_CHANNEL_ID!r}"
-            f" we got {return_value!r}"
-        )
+            f" we got {return_value!r}")
         raise RuntimeError(
-            "CANNOT GET DEFAULT CHANNEL! See log^ for more info"
-        )
+            "CANNOT GET DEFAULT CHANNEL! See log^ for more info")
 
     # set cache
     _default_channel_cache = return_value
@@ -250,9 +256,8 @@ HELP_CHANNEL_IDS = [
 ]
 
 
-async def send_msg_to_moderation_log(
-    txt: str, ping_: bool, color: int
-) -> None:
+async def send_msg_to_moderation_log(txt: str, ping_: bool,
+                                     color: int) -> None:
     """
     Send message `txt` to the moderation log channel.
 
@@ -280,9 +285,8 @@ async def send_msg_to_moderation_log(
             )
             logger.info("Success!")
         except Exception:
-            logger.error(
-                f"Failed to send {txt} to moderation log; ignoring", True
-            )
+            logger.error(f"Failed to send {txt} to moderation log; ignoring",
+                         True)
 
 
 async def get_help_channels() -> list[guilded.TextChannel]:
@@ -315,8 +319,8 @@ def is_help_channel(channel: guilded.TextChannel) -> bool:
 
 
 async def get_message_from_channels(
-    message_id: str, channels: Iterable[guilded.TextChannel]
-) -> guilded.Message:
+        message_id: str,
+        channels: Iterable[guilded.TextChannel]) -> guilded.Message:
     """
     Get message with ID `message_id` from channels(!) `channels`.
 
@@ -337,8 +341,7 @@ async def get_message_from_channels(
             continue
     logger.error(
         f"Message with ID {message_id!r} was not found in these channels:"
-        f" {channels!r}"
-    )
+        f" {channels!r}")
     await send_msg_to_moderation_log(
         f"Could not find message with ID `{message_id!r}` in these channels:"
         f" `{channels!r}`.",
@@ -425,13 +428,8 @@ async def on_member_join(event: guilded.MemberJoinEvent) -> None:
         logger.debug("Getting default channel...")
         default_channel = await get_default_channel()
         logger.debug(f"Got {default_channel}, sending message...")
-        await default_channel.send(
-            embed=guilded.Embed(
-                description=WELCOME.format(
-                    f"<@{event.member.id}>",
-                ),
-            ),
-        )
+        await default_channel.send(embed=guilded.Embed(
+            description=WELCOME.format(f"<@{event.member.id}>", ), ), )
         logger.info(f"Successfully greeted {event.member}")
 
 
@@ -447,9 +445,8 @@ async def on_member_join(event: guilded.MemberJoinEvent) -> None:
 # ****************************************************************************
 
 
-async def claim_help_channel(
-    channel: guilded.TextChannel, user_id: str
-) -> None:
+async def claim_help_channel(channel: guilded.TextChannel,
+                             user_id: str) -> None:
     """
     Claim a help channel.
 
@@ -458,16 +455,12 @@ async def claim_help_channel(
         user_id (str): The user's ID.
     """
     logger.info(f"User with ID {user_id} is claiming {channel}")
-    await channel.send(
-        embed=guilded.Embed(
-            description=HELP_CHANNEL_YOURS.format(f"<@{user_id}>")
-        )
-    )
+    await channel.send(embed=guilded.Embed(
+        description=HELP_CHANNEL_YOURS.format(f"<@{user_id}>")))
 
 
-async def done_help_channel(
-    channel: guilded.TextChannel, user_id: str
-) -> None:
+async def done_help_channel(channel: guilded.TextChannel,
+                            user_id: str) -> None:
     """
     Mark a help channel as done.
 
@@ -476,17 +469,13 @@ async def done_help_channel(
         user_id (str): The user's ID.
     """
     logger.info(f"User with ID {user_id} is marking {channel} as done")
-    await channel.send(
-        embed=guilded.Embed(
-            description=HELP_CHANNEL_DONE.format(f"<@{user_id}>")
-        )
-    )
+    await channel.send(embed=guilded.Embed(
+        description=HELP_CHANNEL_DONE.format(f"<@{user_id}>")))
 
 
 @client.event
 async def on_message_reaction_add(
-    event: guilded.MessageReactionAddEvent,
-) -> None:
+    event: guilded.MessageReactionAddEvent, ) -> None:
     """
     On message reaction add -> if sent in help channel -> if it's on bots
     message -> do something
@@ -509,8 +498,7 @@ async def on_message_reaction_add(
 
     logger.info(
         f"User with ID {event.user_id} added a reaction on bot's message in"
-        f" channel with ID {event.channel_id}"
-    )
+        f" channel with ID {event.channel_id}")
     with logger.ctxmgr:
         if event.emote.name == "hand":
             logger.debug("It's hand")
@@ -532,8 +520,7 @@ async def on_message_reaction_add(
                     f" `{event.emote.name}`"
                     " emote. Please react with the default `hand` emote"
                     " ( :hand: ) or with the default `checkered_flag` emote"
-                    " ( :checkered_flag: )."
-                ),
+                    " ( :checkered_flag: )."),
                 private=True,
             )
 
@@ -551,7 +538,8 @@ async def on_message_reaction_add(
 
 
 def reply_command(
-    text: str, color: Any = None
+    text: str,
+    color: Any = None
 ) -> Callable[[guilded.Message], Coroutine[Any, Any, None]]:
     """
     A command that simply replies with `text`.
@@ -563,7 +551,6 @@ def reply_command(
     Returns:
         Callable[[guilded.Message], Coroutine[Any, Any, None]]: The function.
     """
-
     async def wrapper(message: guilded.Message) -> None:
         await message.reply(embed=guilded.Embed(description=text, color=color))
 
@@ -591,6 +578,22 @@ async def help_channel_setup(message: guilded.Message) -> None:
     await message.delete()
 
 
+async def help_channel_done(message: guilded.Message) -> None:
+    """
+    Mark the current help channel as done, and delete the message.
+
+    Args:
+        message (guilded.Message): The message. Everything after
+        `!help-channel-done ` must be a user ID.
+    """
+    if " " in message.content:
+        user_id = message.content.removeprefix("!help-channel-done ")
+        await done_help_channel(message.channel, user_id)
+    else:
+        await message.reply("Psst! The user ID seems to be missing! Don't forget that!", private=True)
+    await message.delete()
+
+
 async def exec_200(result: str, message: guilded.Message) -> None:
     logger.debug("OK, 200")
 
@@ -601,24 +604,17 @@ async def exec_200(result: str, message: guilded.Message) -> None:
             logger.debug(f"{paster = !r}")
             url = paster.submit(result)
             logger.debug(f"{url = !r}")
-            text = (
-                "Your code's output is too long. View it"
-                f" [here]({paster.url.removesuffix('/')}{url})"
-            )
+            text = ("Your code's output is too long. View it"
+                    f" [here]({paster.url.removesuffix('/')}{url})")
             await message.reply(
-                embed=guilded.Embed(description=text, color=0xFFFF00)
-            )
+                embed=guilded.Embed(description=text, color=0xFFFF00))
         return
 
     text = f"""Here's the output of your code:
 ```text
 {result}```"""
     logger.info(text)
-    await message.reply(
-        embed=guilded.Embed(
-            description=text,
-        ),
-    )
+    await message.reply(embed=guilded.Embed(description=text, ), )
     logger.info("Success!")
 
 
@@ -626,51 +622,42 @@ async def exec_400(error: dict[str, Any], message: guilded.Message) -> None:
     logger.info("400!")
     if error == "not_allowed":
         logger.warning("NOT ALLOWED!")
-        await message.reply(
-            embed=guilded.Embed(
-                description="Your code includes stuff that are not"
-                " allowed. HINT: The use of certain modules, and the"
-                " use of open() is not allowed.",
-                color=0xFF0000,
-            ),
-        )
+        await message.reply(embed=guilded.Embed(
+            description="Your code includes stuff that are not"
+            " allowed. HINT: The use of certain modules, and the"
+            " use of open() is not allowed.",
+            color=0xFF0000,
+        ), )
     elif error == "timed_out":
         logger.warning("TIMED OUT!")
-        await message.reply(
-            embed=guilded.Embed(
-                description="Your code timed out. Please don't do that"
-                " again.",
-                color=0xFF0000,
-            ),
-        )
+        await message.reply(embed=guilded.Embed(
+            description="Your code timed out. Please don't do that"
+            " again.",
+            color=0xFF0000,
+        ), )
     elif error == "exception":
         logger.info("Exception")
         exception_pickled_base64: str = error["exception_pickled_base64"]
         exception_pickled = base64.b64decode(
-            exception_pickled_base64.encode(encoding="utf-8")
-        )
+            exception_pickled_base64.encode(encoding="utf-8"))
         exception = pickle.loads(exception_pickled)  # noqa: S301
         text = f"""Your code raised an exception:
 ```py
 {tracebacklib.format_exception(exception)}```"""
         await message.reply(
-            embed=guilded.Embed(description=text, color=0xFFFF00)
-        )
+            embed=guilded.Embed(description=text, color=0xFFFF00))
 
 
 async def exec(  # pylint: disable=redefined-builtin
-    message: guilded.Message,
-) -> None:
+        message: guilded.Message, ) -> None:
     """
     Execute code in `message`.
 
     Args:
         message (guilded.Message): The message
     """
-    logger.info(
-        f"Got execution request! {message = !r} (by user ID"
-        f" {message.author_id})"
-    )
+    logger.info(f"Got execution request! {message = !r} (by user ID"
+                f" {message.author_id})")
     with logger.ctxmgr:
         message_content = message.content
         message_content = message_content.removeprefix("!exec")
@@ -682,10 +669,8 @@ async def exec(  # pylint: disable=redefined-builtin
         logger.debug(f"Code is {message_content}")
 
         data = json.dumps({"code": message_content})
-        logger.info(
-            f"Making POST request to {RUN_PYTHON_FULL_URL!r} with data"
-            f" {data!r}..."
-        )
+        logger.info(f"Making POST request to {RUN_PYTHON_FULL_URL!r} with data"
+                    f" {data!r}...")
         try:
             response = await make_request(
                 "POST",
@@ -694,22 +679,17 @@ async def exec(  # pylint: disable=redefined-builtin
             )
         except httpx.ReadTimeout:
             logger.warning("TIMEOUT!", True)
-            await message.reply(
-                embed=guilded.Embed(
-                    description="Your code timed out. Please don't do that"
-                    " again.",
-                    color=0xFF0000,
-                ),
-            )
+            await message.reply(embed=guilded.Embed(
+                description="Your code timed out. Please don't do that"
+                " again.",
+                color=0xFF0000,
+            ), )
             return
         except Exception:
             logger.error("EXCEPTION WHILE REQUESTING!", True)
-            await message.reply(
-                embed=guilded.Embed(
-                    description="An exception was raised while making the"
-                    " request. Contact staff please."
-                )
-            )
+            await message.reply(embed=guilded.Embed(
+                description="An exception was raised while making the"
+                " request. Contact staff please."))
             return
         if response.status_code == 200:
             await exec_200(response.json(), message)
@@ -717,23 +697,19 @@ async def exec(  # pylint: disable=redefined-builtin
             await exec_400(response.json()["error"], message)
         else:
             logger.error(f"!*!*! STATUS CODE IS {response.status_code} *!*!*!")
-            logger.error(
-                f"""=====
+            logger.error(f"""=====
 DEBUG DETAILS
 {response = !r}
 {response.status_code = !r}
 {response.content = !r}
 {response.text = !r}
 {response.json() = !r}
-====="""
-            )
-            await message.reply(
-                embed=guilded.Embed(
-                    description=f"Status code is {response.status_code}! Try"
-                    " again, or contact staff.",
-                    color=0xFF0000,
-                )
-            )
+=====""")
+            await message.reply(embed=guilded.Embed(
+                description=f"Status code is {response.status_code}! Try"
+                " again, or contact staff.",
+                color=0xFF0000,
+            ))
 
 
 # These commands only reply with text and... that's it
@@ -779,6 +755,7 @@ COMMANDS: dict[str, Callable[[guilded.Message], Coroutine[Any, Any, Any]]] = {
     "!no-attempt": no_attempt,
     "!traceback": traceback,
     "!help-channel-setup": help_channel_setup,
+    "!help-channel-done": help_channel_done,
     "!exec": exec,
     "!help": help_,
 }
@@ -792,9 +769,8 @@ async def on_message(event: guilded.MessageEvent) -> None:
     Args:
         event (guilded.MessageEvent): The event.
     """
-    if (client.user_id or client.user.id) == (
-        event.message.author_id or event.message.author.id
-    ):
+    if (client.user_id or client.user.id) == (event.message.author_id
+                                              or event.message.author.id):
         return
 
     logger.debug(f"{event.message.content}")
