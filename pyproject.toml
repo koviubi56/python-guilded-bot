@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "repl_nix_python-guilded-bot"
+version = "0.1.0"
+description = ""
+authors = ["koviubi56 <<>>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+bpaste = "^1.0.1"
+httpx = "^0.23.3"
+installtool = "^1.0"
+python-dotenv = "^0.21.0"
+"guilded.py" = "^1.6.0"
+python-mylog = "^0.6.0"
+fastapi = "^0.88.0"
+uvicorn = "^0.20.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
