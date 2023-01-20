@@ -788,8 +788,7 @@ DEBUG DETAILS
         logger.warning("FINAL TIMEOUT!")
         await our_message.edit(
             embed=guilded.Embed(
-                description="Your code timed out. If you think that this is an"
-                " error, DM staff, please.",
+                description="The request timed out. Contact staff, please.",
                 color=0xFF0000,
             ),
         )
