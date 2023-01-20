@@ -37,12 +37,36 @@ dotenv.load_dotenv()
 logger = mylog.root.get_child()
 logger.threshold = mylog.Level.debug
 
+if os.environ.get("KEEPALIVE", "0") == "1":
+    from threading import Thread
+
+    import uvicorn
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app = FastAPI()
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=True,
+    )
+
+    @app.get("/")
+    def index():
+        return 200
+
+    Thread(
+        target=lambda: uvicorn.run(app, host="0.0.0.0", port=8000),
+        daemon=True,
+    ).start()
+
 client = guilded.Client(experimental_event_style=True)
 SERVER_ID = "Gjkqrv7l"
 DEFAULT_CHANNEL_ID = "6f804c27-755e-486d-9136-d825b24e4104"
 MODERATOR_ID = 33358040
 RUN_PYTHON_FULL_URL = "https://runpy.koviubi56.repl.co/run"
-
 
 WELCOME = (
     ":hi:{} has joined the server. :PeepoWave: Welcome! Please make sure"
@@ -121,7 +145,8 @@ TRACEBACK = (
 )
 HELP_CHANNEL_YOURS = (
     "The channel is yours {}! Ask your question, and wait for answers. Once "
-    " you're done please react to this message with a :checkered_flag:"
+    " you've got the answer to your question please react to this message with"
+    " a :checkered_flag:"
 )
 HELP_CHANNEL_DONE = (
     "Thanks everyone for helping {}!"
@@ -591,7 +616,26 @@ async def help_channel_setup(message: guilded.Message) -> None:
     await message.delete()
 
 
-async def exec_200(result: str, message: guilded.Message) -> None:
+async def help_channel_done(message: guilded.Message) -> None:
+    """
+    Mark the current help channel as done, and delete the message.
+
+    Args:
+        message (guilded.Message): The message. Everything after
+        `!help-channel-done ` must be a user ID.
+    """
+    if " " in message.content:
+        user_id = message.content.removeprefix("!help-channel-done ")
+        await done_help_channel(message.channel, user_id)
+    else:
+        await message.reply(
+            "Psst! The user ID seems to be missing! Don't forget that!",
+            private=True,
+        )
+    await message.delete()
+
+
+async def exec_200(result: str, our_message: guilded.Message) -> None:
     logger.debug("OK, 200")
 
     if len(result) > 2040:
@@ -605,7 +649,7 @@ async def exec_200(result: str, message: guilded.Message) -> None:
                 "Your code's output is too long. View it"
                 f" [here]({paster.url.removesuffix('/')}{url})"
             )
-            await message.reply(
+            await our_message.edit(
                 embed=guilded.Embed(description=text, color=0xFFFF00)
             )
         return
@@ -614,7 +658,7 @@ async def exec_200(result: str, message: guilded.Message) -> None:
 ```text
 {result}```"""
     logger.info(text)
-    await message.reply(
+    await our_message.edit(
         embed=guilded.Embed(
             description=text,
         ),
@@ -622,11 +666,13 @@ async def exec_200(result: str, message: guilded.Message) -> None:
     logger.info("Success!")
 
 
-async def exec_400(error: dict[str, Any], message: guilded.Message) -> None:
+async def exec_400(
+    error: dict[str, Any], our_message: guilded.Message
+) -> None:
     logger.info("400!")
     if error == "not_allowed":
         logger.warning("NOT ALLOWED!")
-        await message.reply(
+        await our_message.edit(
             embed=guilded.Embed(
                 description="Your code includes stuff that are not"
                 " allowed. HINT: The use of certain modules, and the"
@@ -636,7 +682,7 @@ async def exec_400(error: dict[str, Any], message: guilded.Message) -> None:
         )
     elif error == "timed_out":
         logger.warning("TIMED OUT!")
-        await message.reply(
+        await our_message.edit(
             embed=guilded.Embed(
                 description="Your code timed out. Please don't do that"
                 " again.",
@@ -653,7 +699,7 @@ async def exec_400(error: dict[str, Any], message: guilded.Message) -> None:
         text = f"""Your code raised an exception:
 ```py
 {tracebacklib.format_exception(exception)}```"""
-        await message.reply(
+        await our_message.edit(
             embed=guilded.Embed(description=text, color=0xFFFF00)
         )
 
@@ -671,6 +717,11 @@ async def exec(  # pylint: disable=redefined-builtin
         f"Got execution request! {message = !r} (by user ID"
         f" {message.author_id})"
     )
+    our_message = await message.reply(
+        embed=guilded.Embed(
+            description="Please wait while we're running your code..."
+        )
+    )
     with logger.ctxmgr:
         message_content = message.content
         message_content = message_content.removeprefix("!exec")
@@ -686,39 +737,37 @@ async def exec(  # pylint: disable=redefined-builtin
             f"Making POST request to {RUN_PYTHON_FULL_URL!r} with data"
             f" {data!r}..."
         )
-        try:
-            response = await make_request(
-                "POST",
-                RUN_PYTHON_FULL_URL,
-                request_kwargs={"data": data},
-            )
-        except httpx.ReadTimeout:
-            logger.warning("TIMEOUT!", True)
-            await message.reply(
-                embed=guilded.Embed(
-                    description="Your code timed out. Please don't do that"
-                    " again.",
-                    color=0xFF0000,
-                ),
-            )
-            return
-        except Exception:
-            logger.error("EXCEPTION WHILE REQUESTING!", True)
-            await message.reply(
-                embed=guilded.Embed(
-                    description="An exception was raised while making the"
-                    " request. Contact staff please."
+        for _ in range(3):
+            try:
+                response = await make_request(
+                    "POST",
+                    RUN_PYTHON_FULL_URL,
+                    client_kwargs={"timeout": 15},
+                    request_kwargs={"data": data, "timeout": 15},
                 )
-            )
-            return
-        if response.status_code == 200:
-            await exec_200(response.json(), message)
-        elif response.status_code == 400:
-            await exec_400(response.json()["error"], message)
-        else:
-            logger.error(f"!*!*! STATUS CODE IS {response.status_code} *!*!*!")
-            logger.error(
-                f"""=====
+            except (httpx.ReadTimeout, httpx.ConnectTimeout):
+                logger.info("Timeout!")
+                continue
+            except Exception:
+                logger.error("EXCEPTION WHILE REQUESTING!", True)
+                await our_message.edit(
+                    embed=guilded.Embed(
+                        description="An exception was raised while making the"
+                        " request. Contact staff please."
+                    )
+                )
+                return
+
+            if response.status_code == 200:
+                await exec_200(response.json(), our_message)
+            elif response.status_code == 400:
+                await exec_400(response.json()["error"], our_message)
+            else:
+                logger.error(
+                    f"!*!*! STATUS CODE IS {response.status_code} *!*!*!"
+                )
+                logger.error(
+                    f"""=====
 DEBUG DETAILS
 {response = !r}
 {response.status_code = !r}
@@ -726,14 +775,24 @@ DEBUG DETAILS
 {response.text = !r}
 {response.json() = !r}
 ====="""
-            )
-            await message.reply(
-                embed=guilded.Embed(
-                    description=f"Status code is {response.status_code}! Try"
-                    " again, or contact staff.",
-                    color=0xFF0000,
                 )
-            )
+                await our_message.edit(
+                    embed=guilded.Embed(
+                        description=f"Status code is {response.status_code}!"
+                        " Try again, or contact staff.",
+                        color=0xFF0000,
+                    )
+                )
+            return
+
+        logger.warning("FINAL TIMEOUT!")
+        await our_message.edit(
+            embed=guilded.Embed(
+                description="Your code timed out. If you think that this is an"
+                " error, DM staff, please.",
+                color=0xFF0000,
+            ),
+        )
 
 
 # These commands only reply with text and... that's it
@@ -753,7 +812,7 @@ Get the latency of the bot.
 **!exec**
 Execute python code.
 
-**Functions that just return text:**
+**Commands that just return text:**
 - `!law`
 - `!exam`
 - `!paid`
@@ -769,7 +828,13 @@ Execute python code.
 )
 
 COMMANDS: dict[str, Callable[[guilded.Message], Coroutine[Any, Any, Any]]] = {
+    # Help channel stuff:
+    "!help-channel-setup": help_channel_setup,
+    "!help-channel-done": help_channel_done,
+    # Other commands:
+    "!exec": exec,
     "!ping": ping,
+    # Commands that just return text:
     "!law": law,
     "!exam": exam,
     "!paid": paid,
@@ -778,9 +843,7 @@ COMMANDS: dict[str, Callable[[guilded.Message], Coroutine[Any, Any, Any]]] = {
     "!image-exc": image_exc,
     "!no-attempt": no_attempt,
     "!traceback": traceback,
-    "!help-channel-setup": help_channel_setup,
-    "!exec": exec,
-    "!help": help_,
+    "!help": help_,  # ! Must be at the bottom!
 }
 
 
