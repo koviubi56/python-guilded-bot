@@ -58,7 +58,9 @@ if os.environ.get("KEEPALIVE", "0") == "1":
         return 200
 
     Thread(
-        target=lambda: uvicorn.run(app, host="0.0.0.0", port=8000),
+        target=lambda: uvicorn.run(  # noqa: S104
+            app, host="0.0.0.0", port=8000
+        ),
         daemon=True,
     ).start()
 
@@ -67,6 +69,7 @@ SERVER_ID = "Gjkqrv7l"
 DEFAULT_CHANNEL_ID = "6f804c27-755e-486d-9136-d825b24e4104"
 MODERATOR_ID = 33358040
 RUN_PYTHON_FULL_URL = "https://runpy.koviubi56.repl.co/run"
+NEW_LINE = "\n"
 
 WELCOME = (
     ":hi:{} has joined the server. :PeepoWave: Welcome! Please make sure"
@@ -670,7 +673,7 @@ async def exec_400(
     error: dict[str, Any], our_message: guilded.Message
 ) -> None:
     logger.info("400!")
-    if error == "not_allowed":
+    if error["error"] == "not_allowed":
         logger.warning("NOT ALLOWED!")
         await our_message.edit(
             embed=guilded.Embed(
@@ -680,7 +683,7 @@ async def exec_400(
                 color=0xFF0000,
             ),
         )
-    elif error == "timed_out":
+    elif error["error"] == "timed_out":
         logger.warning("TIMED OUT!")
         await our_message.edit(
             embed=guilded.Embed(
@@ -689,7 +692,7 @@ async def exec_400(
                 color=0xFF0000,
             ),
         )
-    elif error == "exception":
+    elif error["error"] == "exception":
         logger.info("Exception")
         exception_pickled_base64: str = error["exception_pickled_base64"]
         exception_pickled = base64.b64decode(
@@ -698,7 +701,7 @@ async def exec_400(
         exception = pickle.loads(exception_pickled)  # noqa: S301
         text = f"""Your code raised an exception:
 ```py
-{tracebacklib.format_exception(exception)}```"""
+{NEW_LINE.join(tracebacklib.format_exception(exception))}```"""
         await our_message.edit(
             embed=guilded.Embed(description=text, color=0xFFFF00)
         )
@@ -761,7 +764,7 @@ async def exec(  # pylint: disable=redefined-builtin
             if response.status_code == 200:
                 await exec_200(response.json(), our_message)
             elif response.status_code == 400:
-                await exec_400(response.json()["error"], our_message)
+                await exec_400(response.json()["detail"], our_message)
             else:
                 logger.error(
                     f"!*!*! STATUS CODE IS {response.status_code} *!*!*!"
