@@ -1,6 +1,5 @@
 guilded.py
 python-dotenv
 python-mylog
-RestrictedPython
 bpaste
 httpx

@@ -12,7 +12,7 @@ installtool = "^1.0"
 python-dotenv = "^0.21.0"
 "guilded.py" = "^1.6.0"
 python-mylog = "^0.6.0"
-fastapi = "^0.88.0"
+fastapi = "^0.92.0"
 uvicorn = "^0.20.0"
 
 [tool.poetry.dev-dependencies]
